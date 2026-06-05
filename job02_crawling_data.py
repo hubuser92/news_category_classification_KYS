@@ -11,32 +11,45 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from webdriver_manager.chrome import ChromeDriverManager
 import time
+import os
+import pandas as pd
 
 options = ChromeOptions()
 options.add_argument("lang=ko_KR")
 options.add_argument("headless") # 브라우저 안봄
 
-options.add_argument("--window-position=50,50")
-options.add_argument("--window-size=800,950")
-
+os.environ['WDM_LOCAL'] = '1'
 service = ChromeService(executable_path=ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=options)
 
-driver.set_window_position(50, 50)
+os.makedirs('./data', exist_ok=True)
 
-url = 'https://news.naver.com/section/100'
-driver.get(url)
-button_xpath = '//*[@id="newsct"]/div[4]/div/div[2]/a'
-for i in range(5):
-    driver.find_element(By.XPATH, button_xpath).click()
-    time.sleep(0.5)
 
-for i in range(1, 5):
-    for j in range(1, 7):
-        try:
-            title_xpath = '//*[@id="newsct"]/div[4]/div/div[1]/div[{}]/ul/li[{}]/div/div/div[2]/a/strong'.format(i, j)
-            title = driver.find_element(By.XPATH, title_xpath).text
-            print(title)
-        except:
-            print('error',i, j)
+def save_news_section(url, category, file_name):
+    driver.get(url)
+    button_xpath = '//*[@id="newsct"]/div[4]/div/div[2]/a'
+    for i in range(30):
+        driver.find_element(By.XPATH, button_xpath).click()
+        time.sleep(0.5)
 
+    titles = []
+    title_tags = driver.find_elements(
+        By.XPATH,
+        '//*[@id="newsct"]/div[4]/div/div[1]//strong[contains(@class, "sa_text_strong")]'
+    )
+    for title_tag in title_tags:
+        title = title_tag.text
+        if title:
+            titles.append(title)
+
+    df_section_titles = pd.DataFrame(titles, columns=['titles'])
+    df_section_titles['category'] = category
+    df_section_titles.to_csv('./data/{}'.format(file_name), index=False)
+    print('{} 저장 완료: {}개'.format(file_name, len(titles)))
+
+
+try:
+    save_news_section('https://news.naver.com/section/102', 'Social', 'naver_news_social.csv')
+    save_news_section('https://news.naver.com/section/103', 'Culture', 'naver_news_culture.csv')
+finally:
+    driver.quit()
